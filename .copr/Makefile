@@ -1,41 +1,59 @@
-# COPR Makefile for automated nginx-mod-nchan builds  
+# COPR Makefile for automated nginx-mod-nchan builds
 # This fetches the latest nginx version from Fedora repos and builds nchan from git master
+
+# COPR provides outdir, set default for local testing
+outdir ?= .
 
 # Default target for COPR
 srpm:
-	@echo "Starting nginx-mod-nchan SRPM build"
+	@echo "=== Starting nginx-mod-nchan SRPM build ==="
+	@echo "Output directory: $(outdir)"
+	
+	# Ensure we have required tools
+	@which dnf >/dev/null 2>&1 || (echo "ERROR: dnf not found" && exit 1)
+	@which git >/dev/null 2>&1 || (echo "ERROR: git not found" && exit 1)
+	@which rpmbuild >/dev/null 2>&1 || (echo "ERROR: rpmbuild not found" && exit 1)
 	
 	# Query the latest nginx version from Fedora repositories
-	@echo "Querying latest nginx version from Fedora repos..."
+	@echo "=== Querying latest nginx version from Fedora repos ==="
 	$(eval NGINX_VERSION := $(shell dnf repoquery --latest-limit=1 --qf="%{version}" nginx 2>/dev/null || echo "1.28.0"))
 	@echo "Found nginx version: $(NGINX_VERSION)"
 	
 	# Download nginx SRPM from Fedora to get patches
-	@echo "Downloading nginx SRPM from Fedora..."
-	@dnf download --source nginx --destdir=.
+	@echo "=== Downloading nginx SRPM from Fedora ==="
+	dnf download --source nginx --destdir=$(PWD) || \
+		(echo "Failed to download nginx SRPM" && exit 1)
 	
 	# Extract patches from the SRPM
-	@echo "Extracting patches from nginx SRPM..."
-	@rpm2cpio nginx-*.src.rpm | cpio -idmv "*.patch" 2>/dev/null || true
+	@echo "=== Extracting patches from nginx SRPM ==="
+	rpm2cpio nginx-*.src.rpm | cpio -idmv 2>&1 | grep -E "\.patch$$" || true
+	@echo "Patches extracted: $$(ls -1 *.patch 2>/dev/null | wc -l) found"
 	
 	# Download nginx source tarball
-	@echo "Downloading nginx source tarball..."
-	@curl -L -o nginx-$(NGINX_VERSION).tar.gz http://nginx.org/download/nginx-$(NGINX_VERSION).tar.gz || \
-		(echo "Failed to download nginx $(NGINX_VERSION), trying fallback to 1.26.2..." && \
-		 curl -L -o nginx-1.26.2.tar.gz http://nginx.org/download/nginx-1.26.2.tar.gz && \
-		 mv nginx-1.26.2.tar.gz nginx-$(NGINX_VERSION).tar.gz)
+	@echo "=== Downloading nginx source tarball ==="
+	curl -L -o nginx-$(NGINX_VERSION).tar.gz http://nginx.org/download/nginx-$(NGINX_VERSION).tar.gz || \
+		(echo "Failed to download nginx $(NGINX_VERSION), trying fallback..." && \
+		 curl -L -o nginx-1.28.0.tar.gz http://nginx.org/download/nginx-1.28.0.tar.gz && \
+		 mv nginx-1.28.0.tar.gz nginx-$(NGINX_VERSION).tar.gz)
 	
 	# Clone latest nchan from GitHub
-	@echo "Cloning latest nchan from GitHub..."
-	@rm -rf nchan-master
-	@git clone https://github.com/slact/nchan.git nchan-master
+	@echo "=== Cloning latest nchan from GitHub ==="
+	rm -rf nchan-master
+	git clone --depth=50 https://github.com/slact/nchan.git nchan-master || \
+		(echo "Failed to clone nchan repository" && exit 1)
 	
 	# Get nchan version, create tarball, and generate spec file
+	@echo "=== Processing nchan version and creating tarball ==="
 	@NCHAN_VERSION=$$(cd nchan-master && (git describe --tags --always 2>/dev/null || git rev-parse --short HEAD) | sed 's/^v//' | sed 's/-/_/g'); \
 	echo "nchan version: $$NCHAN_VERSION"; \
+	if [ -z "$$NCHAN_VERSION" ]; then \
+		echo "ERROR: Could not determine nchan version"; \
+		exit 1; \
+	fi; \
 	echo "Creating nchan tarball..."; \
-	tar czf nchan-$$NCHAN_VERSION.tar.gz -C . nchan-master --transform "s/^nchan-master/nchan-$$NCHAN_VERSION/"; \
-	echo "Generating spec file..."; \
+	tar czf nchan-$$NCHAN_VERSION.tar.gz -C . nchan-master --transform "s/^nchan-master/nchan-$$NCHAN_VERSION/" || \
+		(echo "Failed to create nchan tarball" && exit 1); \
+	echo "=== Generating spec file ==="; \
 	( \
 	echo '%global  _hardened_build     1'; \
 	echo '%global  nginx_user          nginx'; \
@@ -68,12 +86,17 @@ srpm:
 	echo ''; \
 	if [ -f nginx-auto-cc-gcc.patch ]; then echo 'Patch0:            nginx-auto-cc-gcc.patch'; fi; \
 	i=1; for patch in nginx-*.patch; do \
-		[ -f "$$patch" ] && [ "$$patch" != "nginx-auto-cc-gcc.patch" ] && echo "Patch$$i:            $$patch" && i=$$((i+1)); \
+		if [ -f "$$patch" ] && [ "$$patch" != "nginx-auto-cc-gcc.patch" ]; then \
+			echo "Patch$$i:            $$patch"; \
+			i=$$((i+1)); \
+		fi; \
 	done; \
 	echo ''; \
 	echo '%if 0%{?with_gperftools}'; \
 	echo 'BuildRequires:     gperftools-devel'; \
 	echo '%endif'; \
+	echo 'BuildRequires:     gcc'; \
+	echo 'BuildRequires:     make'; \
 	echo 'BuildRequires:     openssl-devel'; \
 	echo 'BuildRequires:     pcre-devel'; \
 	echo 'BuildRequires:     pcre2-devel'; \
@@ -103,7 +126,10 @@ srpm:
 	echo '%setup -n "nginx-%{nginx_ver}" -q -a 1'; \
 	if [ -f nginx-auto-cc-gcc.patch ]; then echo '%patch 0 -p0'; fi; \
 	i=1; for patch in nginx-*.patch; do \
-		[ -f "$$patch" ] && [ "$$patch" != "nginx-auto-cc-gcc.patch" ] && echo "%patch $$i -p1" && i=$$((i+1)); \
+		if [ -f "$$patch" ] && [ "$$patch" != "nginx-auto-cc-gcc.patch" ]; then \
+			echo "%patch $$i -p1"; \
+			i=$$((i+1)); \
+		fi; \
 	done; \
 	echo ''; \
 	echo '%build'; \
@@ -150,7 +176,6 @@ srpm:
 	echo '    --with-http_stub_status_module \'; \
 	echo '    --with-http_sub_module \'; \
 	echo '    --with-http_v2_module \'; \
-	echo '    --with-http_v3_module \'; \
 	echo '    --with-http_xslt_module=dynamic \'; \
 	echo '    --with-mail=dynamic \'; \
 	echo '    --with-mail_ssl_module \'; \
@@ -200,24 +225,27 @@ srpm:
 	echo '- Automated build from GitHub master branch'; \
 	echo '- Built against Fedora nginx version %{nginx_ver}'; \
 	echo '- Using nchan commit %{nchan_ver}'; \
-	) > nginx-mod-nchan.spec; \
-	echo "Spec file generated successfully"
+	) > nginx-mod-nchan.spec || (echo "Failed to generate spec file" && exit 1); \
+	echo "Spec file generated successfully"; \
+	ls -la nginx-mod-nchan.spec nchan-$$NCHAN_VERSION.tar.gz nginx-$(NGINX_VERSION).tar.gz
 	
 	# Build SRPM
-	@echo "Building SRPM..."
-	@rpmbuild -bs \
+	@echo "=== Building SRPM ==="
+	rpmbuild -bs \
 		--define "_sourcedir $(PWD)" \
 		--define "_specdir $(PWD)" \
 		--define "_builddir $(PWD)" \
 		--define "_srcrpmdir $(outdir)" \
 		--define "_rpmdir $(PWD)" \
-		nginx-mod-nchan.spec
+		nginx-mod-nchan.spec || \
+		(echo "SRPM build failed" && exit 1)
 	
-	@echo "SRPM build complete"
+	@echo "=== SRPM build complete ==="
+	@ls -la $(outdir)/*.src.rpm 2>/dev/null || echo "Warning: No SRPM found in $(outdir)"
 
 # Clean target for local testing
 clean:
-	@rm -f *.tar.gz *.spec *.src.rpm *.patch *.rpm
-	@rm -rf nchan-master
+	@rm -f *.tar.gz *.spec *.src.rpm *.patch *.rpm *.cpio
+	@rm -rf nchan-master nginx-*.fc*.src.rpm
 
 .PHONY: srpm clean

@@ -1,3 +1,26 @@
+# Build artifacts in .copr directory
+.copr/*.tar.gz
+.copr/*.tar.xz
+.copr/*.tar.bz2
+.copr/*.src.rpm
+.copr/*.rpm
+.copr/*.spec
+.copr/*.patch
+.copr/*.key
+.copr/*.png
+.copr/*.conf
+.copr/*.service
+.copr/*.logrotate
+.copr/*.sysusers
+.copr/*.attr
+.copr/*.in
+.copr/nginx-*
+.copr/nchan-*
+.copr/README.*
+.copr/UPGRADE-*
+.copr/*.8
+.copr/*.asc
+
 # Build artifacts
 *.tar.gz
 *.tar.xz
