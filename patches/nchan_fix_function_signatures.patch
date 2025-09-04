@@ -1,0 +1,142 @@
+diff -up a/src/subscribers/longpoll.c b/src/subscribers/longpoll.c
+--- a/src/subscribers/longpoll.c	2023-04-20 00:00:00.000000000 +0000
++++ b/src/subscribers/longpoll.c	2025-01-26 00:00:00.000000000 +0000
+@@ -17,7 +17,8 @@ ngx_int_t memstore_slot(void);
+ 
+ static const subscriber_t new_longpoll_sub;
+ 
+-static void empty_handler() { }
++static void empty_subscriber_handler(subscriber_t *sub, void *data) { }
++static void empty_cleanup_handler(void *data) { }
+ 
+ static void sudden_abort_handler(subscriber_t *sub) {
+   if(sub->request && sub->status != DEAD) {
+@@ -56,10 +57,10 @@ static ngx_int_t longpoll_subscriber_cre
+   
+   nchan_subscriber_init_timeout_timer(&fsub->sub, &fsub->data.timeout_ev);
+   
+-  fsub->data.enqueue_callback = empty_handler;
++  fsub->data.enqueue_callback = empty_subscriber_handler;
+   fsub->data.enqueue_callback_data = NULL;
+   
+-  fsub->data.dequeue_callback = empty_handler;
++  fsub->data.dequeue_callback = empty_subscriber_handler;
+   fsub->data.dequeue_callback_data = NULL;
+   
+   fsub->data.already_responded = 0;
+@@ -296,7 +297,7 @@ static ngx_int_t longpoll_respond_messag
+   }
+   if(!cf->longpoll_multimsg) {
+     //disable abort handler
+-    fsub->data.cln->handler = empty_handler;
++    fsub->data.cln->handler = empty_cleanup_handler;
+     
+     assert(fsub->data.already_responded != 1);
+     fsub->data.already_responded = 1;
+@@ -343,7 +344,7 @@ static ngx_int_t longpoll_multipart_resp
+   nchan_longpoll_multimsg_t *first, *cur;
+   
+   //disable abort handler
+-  fsub->data.cln->handler = empty_handler;
++  fsub->data.cln->handler = empty_cleanup_handler;
+   
+   first = fsub->data.multimsg_first;
+   
+@@ -455,7 +456,7 @@ static ngx_int_t longpoll_respond_status
+   
+   
+   assert(fsub->data.cln != NULL);
+-  fsub->data.cln->handler = empty_handler;
++  fsub->data.cln->handler = empty_cleanup_handler;
+   
+   rc = nchan_respond_status(r, status_code, status_line, status_code >= 400 ? 1 : 0);
+   
+@@ -468,7 +469,7 @@ static void longpoll_subscriber_finalize
+   ngx_http_request_t     *r = fsub->sub.request;
+   nchan_loc_conf_t       *cf = fsub->sub.cf;
+   nchan_request_ctx_t    *ctx;
+   
+-  fsub->data.cln->handler = (ngx_http_cleanup_pt )empty_handler;
++  fsub->data.cln->handler = (ngx_http_cleanup_pt )empty_cleanup_handler;
+   fsub->data.finalize_request = 0;
+   fsub->sub.status = DEAD;
+   fsub->sub.fn->dequeue(&fsub->sub);
+@@ -483,7 +484,7 @@ void subscriber_maybe_dequeue_after_stat
+ 
+ void subscriber_maybe_dequeue_after_status_response(full_subscriber_t *fsub, ngx_int_t status_code) {
+   if((status_code >=400 && status_code < 600) || status_code == NGX_HTTP_NOT_MODIFIED) {
+-    fsub->data.cln->handler = (ngx_http_cleanup_pt )empty_handler;
++    fsub->data.cln->handler = (ngx_http_cleanup_pt )empty_cleanup_handler;
+     fsub->sub.request->keepalive=0;
+     fsub->data.finalize_request=1;
+     fsub->sub.request->headers_out.status = status_code;
+diff -up a/src/subscribers/websocket.c b/src/subscribers/websocket.c
+--- a/src/subscribers/websocket.c	2023-04-20 00:00:00.000000000 +0000
++++ b/src/subscribers/websocket.c	2025-01-26 00:00:00.000000000 +0000
+@@ -213,7 +213,8 @@ typedef struct {
+ }
+ 
+ static const subscriber_t new_websocket_sub;
+-static void empty_handler() { }
++static void empty_subscriber_handler(subscriber_t *sub, void *data) { }
++static void empty_cleanup_handler(void *data) { }
+ 
+ static void sudden_abort_handler(subscriber_t *sub) {
+   full_subscriber_t  *fsub = (full_subscriber_t  *)sub;
+@@ -279,7 +280,7 @@ static void websocket_finalize_request(f
+   ngx_http_request_t *r = sub->request;
+   
+   if(fsub->cln) {
+-    fsub->cln->handler = (ngx_http_cleanup_pt )empty_handler;
++    fsub->cln->handler = (ngx_http_cleanup_pt )empty_cleanup_handler;
+   }
+   
+   if(sub->cf->unsubscribe_request_url && sub->enqueued) {
+@@ -745,10 +746,10 @@ static ngx_int_t websocket_subscriber_cr
+   
+   ngx_memzero(&fsub->deflate, sizeof(fsub->deflate));
+   
+-  fsub->enqueue_callback = empty_handler;
++  fsub->enqueue_callback = empty_subscriber_handler;
+   fsub->enqueue_callback_data = NULL;
+   
+-  fsub->dequeue_callback = empty_handler;
++  fsub->dequeue_callback = empty_subscriber_handler;
+   fsub->dequeue_callback_data = NULL;
+   fsub->awaiting_destruction = 0;
+   
+diff -up a/src/subscribers/memstore_ipc.c b/src/subscribers/memstore_ipc.c
+--- a/src/subscribers/memstore_ipc.c	2023-04-20 00:00:00.000000000 +0000
++++ b/src/subscribers/memstore_ipc.c	2025-01-26 00:00:00.000000000 +0000
+@@ -26,8 +26,8 @@ typedef struct {
+   ngx_event_t                   timeout_ev;
+ }; //sub_data_t
+ 
+-static ngx_int_t empty_callback(){
+-  return NGX_OK;
++static ngx_int_t empty_callback(ngx_int_t status, void *ptr1, void *ptr2){
++  return NGX_OK;
+ }
+ 
+ static ngx_int_t sub_enqueue(ngx_int_t status, void *ptr, sub_data_t *d) {
+diff -up a/src/subscribers/eventsource.c b/src/subscribers/eventsource.c
+--- a/src/subscribers/eventsource.c	2023-04-20 00:00:00.000000000 +0000
++++ b/src/subscribers/eventsource.c	2025-01-26 00:00:00.000000000 +0000
+@@ -244,7 +244,7 @@ static void es_ensure_headers_sent(full_
+   es_ensure_headers_sent(fsub);
+ }
+ 
+-static void empty_handler(void) {}
++static void empty_cleanup_handler(void *data) {}
+ 
+ static ngx_int_t es_respond_message(subscriber_t *self,  nchan_msg_t *msg) {
+   full_subscriber_t  *fsub = (full_subscriber_t  *)self;
+@@ -275,7 +275,7 @@ static ngx_int_t es_respond_message(subs
+   DBG("%p output msg to subscriber", self);
+   
+   if(fsub->data.cln != NULL) {
+-    fsub->data.cln->handler = (ngx_http_cleanup_pt )empty_handler;
++    fsub->data.cln->handler = (ngx_http_cleanup_pt )empty_cleanup_handler;
+   }
+   
+   es_ensure_headers_sent(fsub);

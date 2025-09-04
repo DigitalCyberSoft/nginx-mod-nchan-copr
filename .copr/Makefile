@@ -60,6 +60,28 @@ srpm:
 	NCHAN_VER=$$(cd nchan-master && (git describe --tags --always 2>/dev/null || git rev-parse --short HEAD) | sed 's/^v//' | sed 's/-/_/g'); \
 	echo "nchan version: $$NCHAN_VER"; \
 	\
+	echo "=== Applying patches if needed ==="; \
+	echo "Checking Fedora version for patch requirements..."; \
+	FEDORA_VER=$$(rpm -E %fedora 2>/dev/null || echo 0); \
+	echo "Fedora version: $$FEDORA_VER"; \
+	if [ "$$FEDORA_VER" -ge "42" ] 2>/dev/null || [ "$$FEDORA_VER" = "rawhide" ]; then \
+		echo "Fedora 42+ detected, applying function signature patch..."; \
+		if [ -f ../patches/nchan_fix_function_signatures.patch ]; then \
+			cp ../patches/nchan_fix_function_signatures.patch .; \
+			echo "Attempting to apply function signature patch..."; \
+			if (cd nchan-master && patch -p1 < ../nchan_fix_function_signatures.patch); then \
+				echo "Patch applied successfully"; \
+			else \
+				echo "WARNING: Patch failed to apply cleanly - the issue may already be fixed upstream"; \
+				echo "Continuing without the patch..."; \
+			fi; \
+		else \
+			echo "Warning: Patch file not found at ../patches/nchan_fix_function_signatures.patch"; \
+		fi; \
+	else \
+		echo "Fedora $$FEDORA_VER does not require patches"; \
+	fi; \
+	\
 	echo "=== Creating nchan tarball ==="; \
 	tar czf nchan-$$NCHAN_VER.tar.gz -C . nchan-master --transform "s/^nchan-master/nchan-$$NCHAN_VER/" || exit 1; \
 	\
@@ -92,6 +114,10 @@ srpm:
 	echo ''; \
 	echo 'Source0:           nginx-%{nginx_ver}.tar.gz'; \
 	echo 'Source1:           nchan-%{nchan_ver}.tar.gz'; \
+	if [ "$$FEDORA_VER" -ge "42" ] 2>/dev/null || [ "$$FEDORA_VER" = "rawhide" ]; then \
+		echo '# Patch for F42+ to fix function signatures'; \
+		echo 'Source2:           nchan_fix_function_signatures.patch'; \
+	fi; \
 	echo ''; \
 	echo 'BuildRequires:     gcc'; \
 	echo 'BuildRequires:     make'; \
