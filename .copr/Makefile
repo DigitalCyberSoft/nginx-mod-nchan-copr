@@ -61,21 +61,31 @@ srpm:
 	echo "nchan version: $$NCHAN_VER"; \
 	\
 	echo "=== Applying patches if needed ==="; \
+	echo "Current directory: $$(pwd)"; \
+	echo "Listing parent directory:"; \
+	ls -la ../ || echo "Cannot list parent"; \
+	echo "Listing patches directory:"; \
+	ls -la ../patches/ || echo "No patches directory"; \
 	echo "Checking Fedora version for patch requirements..."; \
 	FEDORA_VER=$$(rpm -E %fedora 2>/dev/null || echo 0); \
 	echo "Fedora version: $$FEDORA_VER"; \
 	if [ "$$FEDORA_VER" -ge "42" ] 2>/dev/null || [ "$$FEDORA_VER" = "rawhide" ]; then \
 		echo "Fedora 42+ detected, applying GCC 15 function signature patch..."; \
 		if [ -f ../patches/nchan_gcc15_function_signatures.patch ]; then \
+			echo "Found patch at ../patches/nchan_gcc15_function_signatures.patch"; \
 			echo "Attempting to apply GCC 15 compatibility patch..."; \
 			if (cd nchan-master && patch -p1 < ../../patches/nchan_gcc15_function_signatures.patch); then \
 				echo "Patch applied successfully"; \
 			else \
-				echo "WARNING: Patch failed to apply cleanly - the issue may already be fixed upstream"; \
-				echo "Continuing without the patch..."; \
+				echo "ERROR: Patch failed to apply!"; \
+				echo "Patch output above. Continuing anyway..."; \
 			fi; \
 		else \
-			echo "Warning: Patch file not found at ../patches/nchan_gcc15_function_signatures.patch"; \
+			echo "ERROR: Patch file not found at ../patches/nchan_gcc15_function_signatures.patch"; \
+			echo "Contents of current dir:"; \
+			ls -la; \
+			echo "Contents of parent dir:"; \
+			ls -la ../; \
 		fi; \
 	else \
 		echo "Fedora $$FEDORA_VER does not require patches"; \
