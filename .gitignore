@@ -29,8 +29,9 @@
 *.rpm
 *.spec
 
-# Patches extracted from SRPM
+# Patches extracted from SRPM (but not in patches/ folder)
 *.patch
+!patches/*.patch
 
 # Cloned repositories
 nchan-master/
