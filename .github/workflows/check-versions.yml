@@ -1,0 +1,74 @@
+name: Check for Updates
+
+on:
+  # Run every 6 hours
+  schedule:
+    - cron: '0 */6 * * *'
+  
+  # Allow manual trigger from GitHub UI
+  workflow_dispatch:
+  
+  # Run on push to test the workflow
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/check-versions.yml'
+
+jobs:
+  check-versions:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Configure git
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "actions@github.com"
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y curl jq
+        # Install dnf for nginx version checking
+        sudo apt-get install -y dnf || true
+    
+    - name: Check for version updates
+      id: check
+      run: |
+        chmod +x check_versions.sh
+        # Run in update mode to auto-commit if changes detected
+        if ./check_versions.sh --update; then
+          echo "No updates found"
+          echo "updated=false" >> $GITHUB_OUTPUT
+        else
+          echo "Updates found and committed"
+          echo "updated=true" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Get commit message
+      if: steps.check.outputs.updated == 'true'
+      id: commit_msg
+      run: |
+        echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
+    
+    - name: Create Pull Request
+      if: steps.check.outputs.updated == 'true'
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: ${{ steps.commit_msg.outputs.message }}
+        title: 'Auto-update: New versions available'
+        body: |
+          This PR was automatically created by the version checking workflow.
+          
+          The following versions have been updated:
+          ${{ steps.commit_msg.outputs.message }}
+          
+          Merging this PR will trigger a new COPR build with the updated versions.
+        branch: auto-update-versions
+        delete-branch: true

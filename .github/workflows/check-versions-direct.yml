@@ -1,0 +1,46 @@
+name: Check and Auto-Update Versions
+
+on:
+  # Run every 6 hours
+  schedule:
+    - cron: '0 */6 * * *'
+  
+  # Allow manual trigger from GitHub UI
+  workflow_dispatch:
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        # Use PAT if you have one for pushing, otherwise default token
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Configure git
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "actions@github.com"
+    
+    - name: Check and update versions
+      run: |
+        chmod +x check_versions.sh
+        
+        # The script will exit with code 1 if updates are found
+        # This is expected behavior, not an error
+        set +e
+        ./check_versions.sh --update
+        EXIT_CODE=$?
+        set -e
+        
+        if [ $EXIT_CODE -eq 1 ]; then
+          echo "✅ Updates found and pushed to repository"
+          echo "This will trigger a new COPR build"
+        else
+          echo "ℹ️ No version updates found"
+        fi
+        
+        # Always exit successfully so the workflow doesn't show as failed
+        exit 0
