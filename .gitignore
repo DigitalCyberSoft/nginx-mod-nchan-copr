@@ -1,0 +1,49 @@
+# Build artifacts
+*.tar.gz
+*.tar.xz
+*.tar.bz2
+*.src.rpm
+*.rpm
+*.spec
+
+# Patches extracted from SRPM
+*.patch
+
+# Cloned repositories
+nchan-master/
+nchan/
+
+# Build directories
+BUILD/
+BUILDROOT/
+RPMS/
+SRPMS/
+SOURCES/
+SPECS/
+
+# Editor files
+*.swp
+*.swo
+*~
+.*.swp
+.#*
+\#*#
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# COPR build logs
+*.log
+build-*.log
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
+
+# RPM database files
+.rpm*
+
+# cpio extracted files
+*.cpio
