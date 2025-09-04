@@ -205,6 +205,8 @@ srpm:
 	echo '%{_libdir}/nginx/modules/ngx_nchan_module.so'; \
 	echo '%exclude /etc/nginx/*'; \
 	echo '%exclude /usr/sbin/nginx'; \
+	echo '%exclude /usr/bin/nginx'; \
+	echo '%exclude /usr/lib/debug/*'; \
 	echo '%exclude /usr/share/man/*'; \
 	echo '%exclude /usr/share/nginx/html/*'; \
 	echo '%exclude %{_libdir}/nginx/modules/ngx_http_*.so'; \
