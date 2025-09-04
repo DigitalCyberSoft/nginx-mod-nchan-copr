@@ -53,43 +53,13 @@ srpm:
 	fi; \
 	\
 	echo "=== Cloning nchan from GitHub ==="; \
+	echo "NOTE: Using forked repository with GCC 15 fixes until upstream PR #706 is merged"; \
 	rm -rf nchan-master; \
-	git clone --depth=50 https://github.com/slact/nchan.git nchan-master || exit 1; \
+	git clone --depth=50 https://github.com/DigitalCyberSoft/nchan.git nchan-master || exit 1; \
 	\
 	echo "=== Getting nchan version ==="; \
 	NCHAN_VER=$$(cd nchan-master && (git describe --tags --always 2>/dev/null || git rev-parse --short HEAD) | sed 's/^v//' | sed 's/-/_/g'); \
 	echo "nchan version: $$NCHAN_VER"; \
-	\
-	echo "=== Applying patches if needed ==="; \
-	echo "Current directory: $$(pwd)"; \
-	echo "Listing parent directory:"; \
-	ls -la ../ || echo "Cannot list parent"; \
-	echo "Listing patches directory:"; \
-	ls -la ../patches/ || echo "No patches directory"; \
-	echo "Checking Fedora version for patch requirements..."; \
-	FEDORA_VER=$$(rpm -E %fedora 2>/dev/null || echo 0); \
-	echo "Fedora version: $$FEDORA_VER"; \
-	if [ "$$FEDORA_VER" -ge "42" ] 2>/dev/null || [ "$$FEDORA_VER" = "rawhide" ]; then \
-		echo "Fedora 42+ detected, applying GCC 15 function signature patch..."; \
-		if [ -f ../patches/nchan_gcc15_function_signatures.patch ]; then \
-			echo "Found patch at ../patches/nchan_gcc15_function_signatures.patch"; \
-			echo "Attempting to apply GCC 15 compatibility patch..."; \
-			if (cd nchan-master && patch -p1 < ../../patches/nchan_gcc15_function_signatures.patch); then \
-				echo "Patch applied successfully"; \
-			else \
-				echo "ERROR: Patch failed to apply!"; \
-				echo "Patch output above. Continuing anyway..."; \
-			fi; \
-		else \
-			echo "ERROR: Patch file not found at ../patches/nchan_gcc15_function_signatures.patch"; \
-			echo "Contents of current dir:"; \
-			ls -la; \
-			echo "Contents of parent dir:"; \
-			ls -la ../; \
-		fi; \
-	else \
-		echo "Fedora $$FEDORA_VER does not require patches"; \
-	fi; \
 	\
 	echo "=== Creating nchan tarball ==="; \
 	tar czf nchan-$$NCHAN_VER.tar.gz -C . nchan-master --transform "s/^nchan-master/nchan-$$NCHAN_VER/" || exit 1; \

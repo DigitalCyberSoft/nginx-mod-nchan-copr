@@ -3,6 +3,8 @@
 This repository automates building nginx-mod-nchan packages for Fedora COPR, always using:
 - The latest nginx version available in Fedora repositories
 - The latest nchan code from GitHub master branch
+
+> **Note**: Currently using forked repository (https://github.com/DigitalCyberSoft/nchan.git) with GCC 15 compatibility fixes for Fedora 42+ until upstream PR [#706](https://github.com/slact/nchan/pull/706) is merged.
 - Official Fedora nginx patches
 
 ## Features
