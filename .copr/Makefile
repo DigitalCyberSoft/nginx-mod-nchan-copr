@@ -67,9 +67,8 @@ srpm:
 	if [ "$$FEDORA_VER" -ge "42" ] 2>/dev/null || [ "$$FEDORA_VER" = "rawhide" ]; then \
 		echo "Fedora 42+ detected, applying function signature patch..."; \
 		if [ -f ../patches/nchan_fix_function_signatures.patch ]; then \
-			cp ../patches/nchan_fix_function_signatures.patch .; \
 			echo "Attempting to apply function signature patch..."; \
-			if (cd nchan-master && patch -p1 < ../nchan_fix_function_signatures.patch); then \
+			if (cd nchan-master && patch -p1 < ../../patches/nchan_fix_function_signatures.patch); then \
 				echo "Patch applied successfully"; \
 			else \
 				echo "WARNING: Patch failed to apply cleanly - the issue may already be fixed upstream"; \
@@ -114,10 +113,6 @@ srpm:
 	echo ''; \
 	echo 'Source0:           nginx-%{nginx_ver}.tar.gz'; \
 	echo 'Source1:           nchan-%{nchan_ver}.tar.gz'; \
-	if [ "$$FEDORA_VER" -ge "42" ] 2>/dev/null || [ "$$FEDORA_VER" = "rawhide" ]; then \
-		echo '# Patch for F42+ to fix function signatures'; \
-		echo 'Source2:           nchan_fix_function_signatures.patch'; \
-	fi; \
 	echo ''; \
 	echo 'BuildRequires:     gcc'; \
 	echo 'BuildRequires:     make'; \
