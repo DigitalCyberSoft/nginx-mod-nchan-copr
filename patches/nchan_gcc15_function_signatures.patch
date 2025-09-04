@@ -34,7 +34,7 @@ index a598101c..b1502e0c 100644
      sub->request->headers_out.status = status_code;
      fsub->data.finalize_request=1;
 diff --git a/src/subscribers/longpoll.c b/src/subscribers/longpoll.c
-index e9fe5dc1..32bc9e09 100644
+index 71400c6e..44b0d365 100644
 --- a/src/subscribers/longpoll.c
 +++ b/src/subscribers/longpoll.c
 @@ -17,7 +17,8 @@ ngx_int_t memstore_slot(void);
@@ -47,7 +47,7 @@ index e9fe5dc1..32bc9e09 100644
  
  static void sudden_abort_handler(subscriber_t *sub) {
    if(sub->request && sub->status != DEAD) {
-@@ -56,10 +57,10 @@ ngx_int_t longpoll_subscriber_create(ngx_http_request_t *r, nchan_msg_id_t *msg_
+@@ -56,10 +57,10 @@ subscriber_t *longpoll_subscriber_create(ngx_http_request_t *r, nchan_msg_id_t *
    
    nchan_subscriber_init_timeout_timer(&fsub->sub, &fsub->data.timeout_ev);
    
@@ -60,7 +60,7 @@ index e9fe5dc1..32bc9e09 100644
    fsub->data.dequeue_callback_data = NULL;
    
    fsub->data.already_responded = 0;
-@@ -296,7 +297,7 @@ static ngx_int_t longpoll_respond_message(subscriber_t *self, nchan_msg_t *msg) {
+@@ -296,7 +297,7 @@ static ngx_int_t longpoll_respond_message(subscriber_t *self, nchan_msg_t *msg)
    }
    if(!cf->longpoll_multimsg) {
      //disable abort handler
@@ -69,7 +69,7 @@ index e9fe5dc1..32bc9e09 100644
      
      assert(fsub->data.already_responded != 1);
      fsub->data.already_responded = 1;
-@@ -343,7 +344,7 @@ static ngx_int_t longpoll_multipart_respond(full_subscriber_t *fsub) {
+@@ -344,7 +345,7 @@ static ngx_int_t longpoll_multipart_respond(full_subscriber_t *fsub) {
    nchan_longpoll_multimsg_t *first, *cur;
    
    //disable abort handler
@@ -78,7 +78,7 @@ index e9fe5dc1..32bc9e09 100644
    
    first = fsub->data.multimsg_first;
    
-@@ -456,7 +457,7 @@ static ngx_int_t longpoll_respond_status(subscriber_t *self, ngx_int_t status_co
+@@ -457,7 +458,7 @@ static ngx_int_t longpoll_respond_status(subscriber_t *self, ngx_int_t status_co
    nchan_set_msgid_http_response_headers(r, NULL, &self->last_msgid);
    
    //disable abort handler
@@ -87,8 +87,7 @@ index e9fe5dc1..32bc9e09 100644
    
    nchan_respond_status(r, status_code, status_line, status_body, 0);
  
-@@ -468,7 +469,7 @@ ngx_int_t subscriber_respond_unqueued_status(full_subscriber_t *fsub, ngx_int_t
-   ngx_http_request_t     *r = fsub->sub.request;
+@@ -470,7 +471,7 @@ ngx_int_t subscriber_respond_unqueued_status(full_subscriber_t *fsub, ngx_int_t
    nchan_loc_conf_t       *cf = fsub->sub.cf;
    nchan_request_ctx_t    *ctx;
    
@@ -97,7 +96,7 @@ index e9fe5dc1..32bc9e09 100644
    fsub->data.finalize_request = 0;
    fsub->sub.status = DEAD;
    fsub->sub.fn->dequeue(&fsub->sub);
-@@ -481,7 +482,7 @@ ngx_int_t subscriber_respond_unqueued_status(full_subscriber_t *fsub, ngx_int_t
+@@ -483,7 +484,7 @@ ngx_int_t subscriber_respond_unqueued_status(full_subscriber_t *fsub, ngx_int_t
  
  void subscriber_maybe_dequeue_after_status_response(full_subscriber_t *fsub, ngx_int_t status_code) {
    if((status_code >=400 && status_code < 600) || status_code == NGX_HTTP_NOT_MODIFIED) {
@@ -107,7 +106,7 @@ index e9fe5dc1..32bc9e09 100644
      fsub->data.finalize_request=1;
      fsub->sub.request->headers_out.status = status_code;
 diff --git a/src/subscribers/memstore_ipc.c b/src/subscribers/memstore_ipc.c
-index 67aeb653..8f03ebbe 100644
+index a0a25795..90b908e7 100644
 --- a/src/subscribers/memstore_ipc.c
 +++ b/src/subscribers/memstore_ipc.c
 @@ -26,7 +26,7 @@ struct sub_data_s {
@@ -120,10 +119,11 @@ index 67aeb653..8f03ebbe 100644
  }
  
 diff --git a/src/subscribers/websocket.c b/src/subscribers/websocket.c
-index bd039b4f..f5ea5343 100644
+index f8e8e0ec..f28de67a 100644
 --- a/src/subscribers/websocket.c
 +++ b/src/subscribers/websocket.c
-@@ -213,7 +213,8 @@ typedef struct {
+@@ -213,7 +213,8 @@ struct full_subscriber_s {
+   unsigned                awaiting_destruction:1;
  };// full_subscriber_t
  
 -static void empty_handler() { }
@@ -132,7 +132,7 @@ index bd039b4f..f5ea5343 100644
  
  static ngx_int_t websocket_send_frame(full_subscriber_t *fsub, const u_char opcode, off_t len, ngx_chain_t *chain);
  static void set_buf_to_str(ngx_buf_t *buf, const ngx_str_t *str);
-@@ -279,7 +280,7 @@ static void websocket_finalize_request(full_subscriber_t *fsub) {
+@@ -279,7 +280,7 @@ static ngx_int_t websocket_finalize_request(full_subscriber_t *fsub) {
    ngx_http_request_t *r = sub->request;
    
    if(fsub->cln) {
@@ -141,7 +141,7 @@ index bd039b4f..f5ea5343 100644
    }
    
    if(sub->cf->unsubscribe_request_url && sub->enqueued) {
-@@ -745,10 +746,10 @@ ngx_int_t websocket_subscriber_create(ngx_http_request_t *r, nchan_msg_id_t *msg
+@@ -745,10 +746,10 @@ subscriber_t *websocket_subscriber_create(ngx_http_request_t *r, nchan_msg_id_t
    
    ngx_memzero(&fsub->deflate, sizeof(fsub->deflate));
    
