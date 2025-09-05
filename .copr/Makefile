@@ -13,7 +13,7 @@ srpm:
 	@echo "Output directory: $(outdir)"
 	@echo "Working directory: $$(pwd)"
 	@echo "User: $$(whoami)"
-	
+
 	# Install git if not available
 	@if ! command -v git >/dev/null 2>&1; then \
 		echo "=== Git not found, installing it ==="; \
@@ -31,10 +31,10 @@ srpm:
 	else \
 		echo "=== Git is already available ==="; \
 	fi
-	
+
 	# Verify git is now available
 	@which git || (echo "ERROR: git still not found after installation attempt" && exit 1)
-	
+
 	# Try to detect nginx version, fall back to hardcoded
 	@if command -v dnf >/dev/null 2>&1; then \
 		echo "=== Detecting nginx version from repos ==="; \
@@ -112,7 +112,9 @@ srpm:
 	echo 'BuildRequires:     libxslt-devel'; \
 	echo 'BuildRequires:     systemd'; \
 	echo ''; \
-	echo 'Requires:          nginx >= %{epoch}:%{nginx_ver}'; \
+	echo 'Requires:          nginx = %{epoch}:%{nginx_ver}'; \
+	echo 'Conflicts:         nginx > %{epoch}:%{nginx_ver}'; \
+	echo 'Conflicts:         nginx < %{epoch}:%{nginx_ver}'; \
 	echo 'Requires:          openssl'; \
 	echo 'Requires(post):    systemd'; \
 	echo ''; \
