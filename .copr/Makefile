@@ -63,6 +63,29 @@ srpm:
 	NCHAN_VER=$$(cd nchan-master && (git describe --tags --always 2>/dev/null || git rev-parse --short HEAD) | sed 's/^v//' | sed 's/-/_/g'); \
 	echo "nchan version: $$NCHAN_VER"; \
 	\
+	echo "=== Determining release number ==="; \
+	FULL_VERSION="$$NGINX_VER"_"$$NCHAN_VER"; \
+	FEDORA_VER=$$(rpm -E %fedora 2>/dev/null || echo "42"); \
+	echo "Checking COPR for existing builds of version $$FULL_VERSION on Fedora $$FEDORA_VER"; \
+	COPR_URL="https://download.copr.fedorainfracloud.org/results/reversejames/nginx-mod-nchan/fedora-$$FEDORA_VER-x86_64"; \
+	BUILD_DIRS=$$(curl -s "$$COPR_URL/" 2>/dev/null | grep -oE '[0-9]+-nginx-mod-nchan' | head -10); \
+	EXISTING_RELEASES=""; \
+	for dir in $$BUILD_DIRS; do \
+		RPMS=$$(curl -s "$$COPR_URL/$$dir/" 2>/dev/null | grep -oE "nginx-mod-nchan-$$FULL_VERSION-[0-9]+\.fc[0-9]+\.x86_64\.rpm" | head -1); \
+		if [ -n "$$RPMS" ]; then \
+			REL=$$(echo "$$RPMS" | sed "s/.*-\([0-9]\+\)\.fc[0-9]\+\.x86_64\.rpm/\1/"); \
+			EXISTING_RELEASES="$$EXISTING_RELEASES $$REL"; \
+		fi; \
+	done; \
+	if [ -n "$$EXISTING_RELEASES" ]; then \
+		MAX_REL=$$(echo $$EXISTING_RELEASES | tr ' ' '\n' | sort -n | tail -1); \
+		RELEASE_NUM=$$(($$MAX_REL + 1)); \
+		echo "Found existing release $$MAX_REL, incrementing to $$RELEASE_NUM"; \
+	else \
+		RELEASE_NUM=1; \
+		echo "No existing builds found for $$FULL_VERSION, starting with release 1"; \
+	fi; \
+	\
 	echo "=== Creating nchan tarball ==="; \
 	tar czf nchan-$$NCHAN_VER.tar.gz -C . nchan-master --transform "s/^nchan-master/nchan-$$NCHAN_VER/" || exit 1; \
 	\
@@ -87,7 +110,7 @@ srpm:
 	echo 'Name:              nginx-mod-nchan'; \
 	echo 'Epoch:             1'; \
 	echo 'Version:           %{nginx_ver}_%{nchan_ver}'; \
-	echo 'Release:           1%{?dist}'; \
+	echo "Release:           $$RELEASE_NUM%{?dist}"; \
 	echo ''; \
 	echo 'Summary:           Flexible pub/sub server for the modern web'; \
 	echo 'License:           MIT'; \
