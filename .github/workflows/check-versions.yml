@@ -72,3 +72,9 @@ jobs:
           Merging this PR will trigger a new COPR build with the updated versions.
         branch: auto-update-versions
         delete-branch: true
+
+      # Prevent GitHub from disabling this scheduled workflow after 60 days
+      # of repo inactivity
+      - uses: gautamkrishnar/keepalive-workflow@v2
+        with:
+          time_elapsed: 45

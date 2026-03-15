@@ -44,3 +44,9 @@ jobs:
         
         # Always exit successfully so the workflow doesn't show as failed
         exit 0
+
+      # Prevent GitHub from disabling this scheduled workflow after 60 days
+      # of repo inactivity
+      - uses: gautamkrishnar/keepalive-workflow@v2
+        with:
+          time_elapsed: 45
