@@ -15,6 +15,10 @@ on:
     paths:
       - '.github/workflows/check-versions.yml'
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
   check-versions:
     runs-on: ubuntu-latest
