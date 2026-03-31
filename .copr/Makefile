@@ -55,9 +55,8 @@ srpm:
 	fi; \
 	\
 	echo "=== Cloning nchan from GitHub ==="; \
-	echo "NOTE: Using forked repository with GCC 15 fixes until upstream PR #706 is merged"; \
 	rm -rf nchan-master; \
-	git clone --depth=50 https://github.com/DigitalCyberSoft/nchan.git nchan-master || exit 1; \
+	git clone --depth=50 https://github.com/slact/nchan.git nchan-master || exit 1; \
 	\
 	echo "=== Getting nchan version ==="; \
 	NCHAN_VER=$$(cd nchan-master && (git describe --tags --always 2>/dev/null || git rev-parse --short HEAD) | sed 's/^v//' | sed 's/-/_/g'); \
