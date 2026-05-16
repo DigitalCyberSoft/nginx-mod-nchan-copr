@@ -121,7 +121,10 @@ srpm:
 	echo 'BuildRequires:     gcc'; \
 	echo 'BuildRequires:     make'; \
 	echo 'BuildRequires:     openssl-devel'; \
+	echo '# Fedora retired PCRE1 in rawhide (F45+); EL and older Fedora still ship it.'; \
+	echo '%if 0%{?rhel} || ( 0%{?fedora} && 0%{?fedora} < 45 )'; \
 	echo 'BuildRequires:     pcre-devel'; \
+	echo '%endif'; \
 	echo 'BuildRequires:     pcre2-devel'; \
 	echo 'BuildRequires:     zlib-devel'; \
 	echo ''; \
