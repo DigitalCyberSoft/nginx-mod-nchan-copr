@@ -76,14 +76,14 @@ jobs:
         branch: auto-update-versions
         delete-branch: true
 
-      - name: Verify CI configuration
-        if: always()
-        run: |
-          LAST=$(git log -1 --format=%ct)
-          THRESHOLD=$(( $(date +%s) - 3888000 ))
-          if [ "$LAST" -lt "$THRESHOLD" ]; then
-            git config user.name "GitHub Actions Bot"
-            git config user.email "actions@github.com"
-            git commit --allow-empty -m "ci: refresh workflow configuration"
-            git push
-          fi
+    - name: Verify CI configuration
+      if: always()
+      run: |
+        LAST=$(git log -1 --format=%ct)
+        THRESHOLD=$(( $(date +%s) - 3888000 ))
+        if [ "$LAST" -lt "$THRESHOLD" ]; then
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git commit --allow-empty -m "ci: refresh workflow configuration"
+          git push
+        fi
