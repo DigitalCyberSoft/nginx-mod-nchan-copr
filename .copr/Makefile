@@ -224,10 +224,12 @@ srpm:
 	echo 'echo '\''load_module "%{_libdir}/nginx/modules/ngx_nchan_module.so";'\'' \'; \
 	echo '     > %{buildroot}%{_datadir}/nginx/modules/mod-nchan.conf'; \
 	echo ''; \
-	echo '%post'; \
-	echo 'if [ $$1 -eq 1 ]; then'; \
-	echo '    /usr/bin/systemctl restart nginx.service >/dev/null 2>&1 || :'; \
-	echo 'fi'; \
+	echo '%posttrans'; \
+	echo '# nchan keeps subscriber state in-process and is not reload-safe, so a full'; \
+	echo '# restart is the only way to load a new module .so. %posttrans runs after every'; \
+	echo '# %postun in the transaction (including nginx-upgrade), so it also recovers'; \
+	echo '# nginx if the SIGUSR2 binary-upgrade race left it deactivated.'; \
+	echo '/usr/bin/systemctl restart nginx.service >/dev/null 2>&1 || :'; \
 	echo ''; \
 	echo '%files'; \
 	echo '%{_datadir}/nginx/modules/mod-nchan.conf'; \
