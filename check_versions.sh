@@ -56,9 +56,11 @@ get_timestamp() {
 get_nginx_version() {
     local version=""
     
-    if command -v dnf >/dev/null 2>&1; then
-        version=$(dnf repoquery --latest-limit=1 --qf="%{version}" nginx 2>/dev/null || echo "")
-    fi
+    # Query the Fedora nginx spec directly. The previous dnf approach returned
+    # nothing on non-Fedora CI runners (no Fedora repos), so the check silently
+    # fell back to the default and never detected real updates.
+    version=$(curl -sf "https://src.fedoraproject.org/rpms/nginx/raw/rawhide/f/nginx.spec" 2>/dev/null \
+        | sed -n 's/^Version:[[:space:]]*//p' | head -1)
     
     if [ -z "$version" ]; then
         echo "Warning: Could not query nginx version from Fedora repos, using default" >&2
