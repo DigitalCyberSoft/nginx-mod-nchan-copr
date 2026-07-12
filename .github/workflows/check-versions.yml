@@ -33,32 +33,12 @@ jobs:
         git config --global user.name "GitHub Actions Bot"
         git config --global user.email "actions@github.com"
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y curl jq
-
     - name: Check for version updates
-      id: check
       run: |
         chmod +x check_versions.sh
-        # Run in update mode to auto-commit if changes detected
-        if ./check_versions.sh --update; then
-          echo "No updates found"
-          echo "updated=false" >> $GITHUB_OUTPUT
-        else
-          echo "Updates found and committed"
-          echo "updated=true" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Notify about update
-      if: steps.check.outputs.updated == 'true'
-      run: |
-        echo "New version detected; check_versions.sh committed and pushed."
-        echo "COPR build will be triggered automatically."
-        echo ""
-        echo "Current versions:"
-        cat versions.json
+        # Auto-commits and pushes if changes detected. Success = no change
+        # or update applied; a nonzero exit is a real error.
+        ./check_versions.sh --update
 
     - name: Verify CI configuration
       if: always()

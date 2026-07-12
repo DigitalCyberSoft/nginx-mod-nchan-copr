@@ -7,7 +7,6 @@ set -e
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VERSIONS_FILE="$SCRIPT_DIR/versions.json"
-DEFAULT_NGINX_VERSION="1.28.0"
 
 # Parse command line arguments
 MODE="check"
@@ -59,52 +58,62 @@ get_nginx_version() {
     # Query the Fedora nginx spec directly. The previous dnf approach returned
     # nothing on non-Fedora CI runners (no Fedora repos), so the check silently
     # fell back to the default and never detected real updates.
-    version=$(curl -sf "https://src.fedoraproject.org/rpms/nginx/raw/rawhide/f/nginx.spec" 2>/dev/null \
+    version=$(curl -sf --connect-timeout 15 --max-time 60 --retry 3 --retry-all-errors \
+        "https://src.fedoraproject.org/rpms/nginx/raw/rawhide/f/nginx.spec" 2>/dev/null \
         | sed -n 's/^Version:[[:space:]]*//p' | head -1)
-    
+
+    # Hard-fail when the version cannot be determined. Falling back to a
+    # hardcoded default committed fabricated downgrades (nginx 1.28.2 ->
+    # 1.28.0 on 2026-05-22) and triggered spurious COPR rebuild pairs.
     if [ -z "$version" ]; then
-        echo "Warning: Could not query nginx version from Fedora repos, using default" >&2
-        version="$DEFAULT_NGINX_VERSION"
+        echo "Error: could not determine nginx version from Fedora spec" >&2
+        return 1
     fi
-    
+
     echo "$version"
 }
 
 # Function to get nchan latest commit from GitHub
+# Always yields a bare 7-char commit SHA. Mixing SHA (API path) with
+# git-describe output (clone fallback) made the two paths disagree on
+# identical upstream state and flap versions.json on every API hiccup
+# (e.g. 08ebad8 <-> 1.3.8 ping-pong commits on 2026-05-30/2026-06-05).
 get_nchan_version() {
     local api_url="https://api.github.com/repos/slact/nchan/commits/master"
-    local commit_info=""
-    
+    local commit=""
+
     # Try to get commit info from GitHub API
     if command -v curl >/dev/null 2>&1; then
-        commit_info=$(curl -s "$api_url" | grep -E '"sha":|"date":' | head -2 || echo "")
+        commit=$(curl -sf --connect-timeout 15 --max-time 60 --retry 3 --retry-all-errors "$api_url" 2>/dev/null \
+            | grep '"sha":' | head -1 | sed 's/.*"sha": *"\([^"]*\)".*/\1/' | cut -c1-7)
     fi
-    
-    if [ -n "$commit_info" ]; then
-        # Extract commit SHA (first 7 characters)
-        local commit=$(echo "$commit_info" | grep '"sha":' | sed 's/.*"sha": *"\([^"]*\)".*/\1/' | cut -c1-7)
+
+    if [ -n "$commit" ]; then
         echo "$commit"
-    else
-        # Fallback to git if available and repo exists
-        if command -v git >/dev/null 2>&1; then
-            if [ -d "$SCRIPT_DIR/nchan-master" ]; then
-                cd "$SCRIPT_DIR/nchan-master"
-                git fetch origin master >/dev/null 2>&1 || true
-                git rev-parse --short origin/master 2>/dev/null || echo "unknown"
-            else
-                # Clone temporarily to get version
-                cd "$SCRIPT_DIR"
-                git clone --depth=1 https://github.com/slact/nchan.git nchan-temp >/dev/null 2>&1
-                cd nchan-temp
-                local version=$(git describe --tags --always 2>/dev/null || git rev-parse --short HEAD)
-                cd ..
-                rm -rf nchan-temp
-                echo "$version" | sed 's/^v//'
-            fi
+        return 0
+    fi
+
+    # Fallback: resolve via git, normalised to the same 7-char SHA form
+    if command -v git >/dev/null 2>&1; then
+        if [ -d "$SCRIPT_DIR/nchan-master" ]; then
+            commit=$(cd "$SCRIPT_DIR/nchan-master" \
+                && { git fetch origin master >/dev/null 2>&1 || true; } \
+                && git rev-parse origin/master 2>/dev/null | cut -c1-7)
         else
-            echo "unknown"
+            git clone --depth=1 https://github.com/slact/nchan.git "$SCRIPT_DIR/nchan-temp" >/dev/null 2>&1 || true
+            commit=$(cd "$SCRIPT_DIR/nchan-temp" 2>/dev/null && git rev-parse HEAD 2>/dev/null | cut -c1-7)
+            rm -rf "$SCRIPT_DIR/nchan-temp"
+        fi
+        if [ -n "$commit" ]; then
+            echo "$commit"
+            return 0
         fi
     fi
+
+    # Hard-fail rather than emit a placeholder: committing "unknown" would
+    # fabricate a change and trigger a spurious COPR rebuild.
+    echo "Error: could not determine nchan commit" >&2
+    return 1
 }
 
 # Function to read current versions from JSON
@@ -257,7 +266,12 @@ if [ $VERSIONS_CHANGED -eq 1 ]; then
         echo "Run with --update to apply changes"
     fi
     
-    exit 1  # Exit with error code to indicate changes available
+    # update mode: a successful apply is success; exit 1 only signals
+    # "changes available" to check-only callers (manual use)
+    if [ "$MODE" = "update" ] && [ $DRY_RUN -eq 0 ]; then
+        exit 0
+    fi
+    exit 1
 else
     echo "=== No version changes detected ==="
     echo "  nginx: $CURRENT_NGINX (unchanged)"
