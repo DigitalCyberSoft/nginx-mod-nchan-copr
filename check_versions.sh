@@ -58,7 +58,7 @@ get_nginx_version() {
     # Query the Fedora nginx spec directly. The previous dnf approach returned
     # nothing on non-Fedora CI runners (no Fedora repos), so the check silently
     # fell back to the default and never detected real updates.
-    version=$(curl -sf --connect-timeout 15 --max-time 60 --retry 3 --retry-all-errors \
+    version=$(curl -sf --connect-timeout 15 --max-time 60 --retry 6 --retry-all-errors \
         "https://src.fedoraproject.org/rpms/nginx/raw/rawhide/f/nginx.spec" 2>/dev/null \
         | sed -n 's/^Version:[[:space:]]*//p' | head -1)
 
