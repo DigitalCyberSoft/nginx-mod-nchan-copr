@@ -2,12 +2,12 @@
   "nginx": {
     "version": "1.30.4",
     "source": "fedora",
-    "last_checked": "2026-07-20T03:07:30Z"
+    "last_checked": "2026-09-11T15:54:46Z"
   },
   "nchan": {
-    "version": "1.3.7-2-g6bbb0c2",
-    "commit": "6bbb0c2",
-    "last_checked": "2026-07-20T03:07:30Z"
+    "version": "1.3.7-2-g61906d7",
+    "commit": "61906d7",
+    "last_checked": "2026-09-11T15:54:46Z"
   },
-  "last_update": "2026-07-20T03:07:30Z"
+  "last_update": "2026-09-11T15:54:46Z"
 }
