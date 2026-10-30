@@ -54,6 +54,23 @@ jobs:
           git push --force-with-lease origin master
         fi
     
+    - name: Trigger COPR build
+      # Nothing else reaches COPR: this repo has no COPR webhook.
+      env:
+        COPR_WEBHOOK_URL: ${{ secrets.COPR_WEBHOOK_URL }}
+      run: |
+        if [ -z "$COPR_WEBHOOK_URL" ]; then
+          echo "ERROR: COPR_WEBHOOK_URL secret is not set; COPR was not asked to build" >&2
+          exit 1
+        fi
+        for pkg in nginx-mod-nchan; do
+          id=$(curl -fsS --retry 3 --max-time 60 -X POST "${COPR_WEBHOOK_URL%/}/$pkg/") || {
+            echo "ERROR: COPR did not accept the build request for $pkg" >&2
+            exit 1
+          }
+          echo "COPR build $id requested for $pkg"
+        done
+
     - name: Display rebuild info
       run: |
         echo "✅ Rebuild triggered"

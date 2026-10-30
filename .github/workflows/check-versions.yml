@@ -7,6 +7,11 @@ on:
 
   # Allow manual trigger from GitHub UI
   workflow_dispatch:
+    inputs:
+      copr_build:
+        description: 'Ask COPR to build even if no new commit is pushed'
+        type: boolean
+        default: false
 
   # Run on push to test the workflow
   push:
@@ -28,6 +33,10 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Record the remote head
+      id: copr_before
+      run: echo "head=$(git ls-remote origin HEAD | cut -f1)" >> "$GITHUB_OUTPUT"
+
     - name: Configure git
       run: |
         git config --global user.name "GitHub Actions Bot"
@@ -39,6 +48,36 @@ jobs:
         # Auto-commits and pushes if changes detected. Success = no change
         # or update applied; a nonzero exit is a real error.
         ./check_versions.sh --update
+
+    - name: Trigger COPR build
+      # A pushed commit does not reach COPR by itself (this repo has no
+      # COPR webhook), so ask COPR here and fail the run when that fails.
+      if: always()
+      env:
+        COPR_WEBHOOK_URL: ${{ secrets.COPR_WEBHOOK_URL }}
+        BEFORE: ${{ steps.copr_before.outputs.head }}
+        FORCE: ${{ inputs.copr_build }}
+      run: |
+        AFTER=$(git ls-remote origin HEAD | cut -f1)
+        if [ -z "$BEFORE" ] || [ -z "$AFTER" ]; then
+          echo "ERROR: could not read the remote head (before '$BEFORE', after '$AFTER')" >&2
+          exit 1
+        fi
+        if [ "$AFTER" = "$BEFORE" ] && [ "$FORCE" != "true" ]; then
+          echo "No new commit pushed; no COPR build needed"
+          exit 0
+        fi
+        if [ -z "$COPR_WEBHOOK_URL" ]; then
+          echo "ERROR: COPR_WEBHOOK_URL secret is not set; COPR was not asked to build $AFTER" >&2
+          exit 1
+        fi
+        for pkg in nginx-mod-nchan; do
+          id=$(curl -fsS --retry 3 --max-time 60 -X POST "${COPR_WEBHOOK_URL%/}/$pkg/") || {
+            echo "ERROR: COPR did not accept the build request for $pkg" >&2
+            exit 1
+          }
+          echo "COPR build $id requested for $pkg"
+        done
 
     - name: Verify CI configuration
       if: always()
